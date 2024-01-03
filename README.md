@@ -4,11 +4,12 @@
 - access the video and device drivers directly for speed
 
 commands:
- list -  available uvc devices
- connect - all devices
- patch - a video stream to an HDMI output
- disconnect - a video device to reset it
- exit - cleanly stop
+- list -  available uvc devices
+- connect - all devices
+- patch - a video stream to an HDMI output
+- disconnect - a video device to reset it
+- exit - cleanly stop
 
 desc:
- treat this program like a linux daemon, run from a script so that we're notified if it fails and can restart it.
+#
+Treat this program like a linux daemon, run from a script so that we're notified if it fails and can restart it.
