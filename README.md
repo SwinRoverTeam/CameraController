@@ -1,15 +1,17 @@
-# CameraController
-- listen port 61000 for cmds
-- send back information
-- access the video and device drivers directly for speed
+# v4l2_framebuffer
+Maps the frames from a camera to the display framebuffer.
 
-commands:
-- list -  available uvc devices
-- connect - all devices
-- patch - a video stream to an HDMI output
-- disconnect - a video device to reset it
-- exit - cleanly stop
+To check the supported resolutions:
+```sh
+$ v4l2-ctl --list-formats-ext
+```
 
-desc:
-#
-Treat this program like a linux daemon, run from a script so that we're notified if it fails and can restart it.
+By default, `640x480` is used. You can specify the resolution via commandline paramters. <br>
+The first parameters will be the width, the second one will be the height.
+
+To change your desired resolution, edit macro IM_WIDTH, IM_HEIGHT inside video_capture.h
+
+Press `q`, followed by a press of return, to quit.
+#### This was borrowed from OpenCV's `waitKey` function.
+
+![Example](https://cloud.githubusercontent.com/assets/16308037/21586605/dbcd6192-d10d-11e6-86d8-a9c4ed490f5b.jpg)
