@@ -1,9 +1,3 @@
-/*
- * video_capture.c
- *
- *  Created on: Dec 24, 2015
- *      Author: Lincoln
- */
 #include "video_capture.h"
 
 #include <stdio.h>

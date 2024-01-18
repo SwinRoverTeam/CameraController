@@ -1,9 +1,3 @@
-/*
- * draw_framebuffer.c
- *
- *  Created on: Dec 24, 2015
- *      Author: Lincoln
- */
 #include "draw_framebuffer.h"
 
 #include <stdio.h>
