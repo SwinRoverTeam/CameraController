@@ -1,10 +1,3 @@
-/*
- * video_capture.h
- *
- *  Created on: Dec 24, 2015
- *      Author: Lincoln
- */
-
 #ifndef VIDEO_CAPTURE_H_
 #define VIDEO_CAPTURE_H_
 
@@ -21,4 +14,4 @@ void init_video_capture(int width, int height);
 char video_capture(unsigned char* dst, int width, int height);
 void free_video_capture();
 
-#endif /* VIDEO_CAPTURE_H_ */
+#endif // VIDEO_CAPTURE_H_

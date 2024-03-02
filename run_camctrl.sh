@@ -1,6 +1,8 @@
 #!/bin/bash
 
 DIR="$( cd "$( dirname "$0" )" && pwd )"
-$DIR/camctrl & disown
+
+mkdir $DIR/logs/
+$DIR/cam_ctrl &
 
 return $?

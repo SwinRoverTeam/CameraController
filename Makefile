@@ -18,11 +18,11 @@ OBJS := $(SRC:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 INC_DIRS := $(shell find $(SRC_DIR) -type d)
 INC_FLAGS := $(addprefix -I, $(INC_DIRS))
 
-LDFLAGS += -lv4l2
-CFLAGS += -g
+LDFLAGS += -lc -lv4l2
+CFLAGS += -g $(INC_FLAGS)
 
 # default rule
-all: $(shell mkdir ./obj) $(TARGET)
+all: $(shell mkdir -p ./obj) $(TARGET)
 
 # link step
 $(TARGET): $(OBJS)

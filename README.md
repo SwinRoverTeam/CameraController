@@ -1,12 +1,15 @@
-# v4l2_framebuffer
-Maps the frames from a camera to the display framebuffer.
+# Camera Controller
+Displays selected v4l2 camera feeds based on mavlink commands
+recieved over serial connection from the cubepilot
 
-To check the supported resolutions:
-```sh
-$ v4l2-ctl --list-formats-ext
-```
+commands:
+- list cameras
+- change camera
+- start stream
+- end stream
+- reset
+- stack stream (left, right, top, bottom)
 
-By default, `640x480` is used. You can specify the resolution via commandline paramters. <br>
-The first parameters will be the width, the second one will be the height.
-
-To change your desired resolution, edit macro IM_WIDTH, IM_HEIGHT inside video_capture.h
+Additional functions:
+- Produce a streamable SLAM map
+- Send map/navigation data through mavlink for the cubepilot to process

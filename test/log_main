@@ -1,0 +1,21 @@
+#include <serial_ports.h>
+#include <logging.h>
+#include <stdio.h>
+
+int main(int argc, char* argv[])
+{
+	LOG_CONSOLE("Starting the serial test program %s\n", argv[0]);
+	
+	int serial_port = 0;
+
+	serial_port = open_port("/dev/ttyAMC0", 115200, "8N1", 0);
+
+	if (serial_port == 1) {
+		LOG_INFO("Failed to open port\n");
+		return 0;
+	}
+	
+	LOG_INFO("Port opened!\n");
+
+	return 0;
+}
