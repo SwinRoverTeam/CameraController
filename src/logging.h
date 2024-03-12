@@ -5,7 +5,10 @@
 
 // file name and location
 #define LOG_FILE_NAME "LOG_" __DATE__
-#define FILE_PATH "/home/eamon/src/CameraController/logs"
+
+#ifndef FILE_PATH
+	#define FILE_PATH "/home/eamon/src/CameraController/logs"
+#endif
 
 // log just to the terminal - mostly for testing logs
 #define LOG_CONSOLE(args...) \
@@ -42,6 +45,9 @@
 #endif
 
 // log to file and stdout, only displays in debug build, use for testing
-#define LOG_DEBUG(fmt, args...) if (DEBUG) LOG_INFO(fmt, args)
+#define LOG_DEBUG(args...) \
+	if (DEBUG) { \
+		LOG_INFO(args); \
+	}
 
 #endif //LOGGING_H_

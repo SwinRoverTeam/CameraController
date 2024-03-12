@@ -3,7 +3,6 @@
 #include "video_capture.h"
 #include "serial_ports.h"
 #include "panels.h"
-#include "linux_devices.h"
 
 #include <signal.h>
 #include <stdio.h>
@@ -14,7 +13,7 @@
 // file descriptor for serial port
 int fd;
 
-void initialise_serial(int &fd)
+void initialise_serial()
 {
 	// open a new serial port to cube
 	fd = open_port("/dev/ttyTHS1", 115200, "8N1", 0);
@@ -27,21 +26,8 @@ void initialise_serial(int &fd)
 void list_cameras(void)
 {
 	// list video devices in dev
-	device_tree_t video_devices;
+	device_info_t* video_devices;
 	list_video_devices(&video_devices);
-
-	if (video_devices.num_devices == 0) {
-		LOG_INFO("Could not find any connected video devices\n");
-		return;
-	}
-
-	for (size_t i = 0; i < video_devices.num_devices; i++) {
-		LOG_INFO("%s\n", video_devices.device_name[i]);
-		int buffer_len = strlen(video_devices.device_name);
-		send_buffer_port(fd, video_devices.device_name, buffer_len);
-	}
-
-	clear_device_list(video_devices);
 }
 
 void change_camera(char* device)
@@ -102,7 +88,7 @@ int main(int argc, char** argv)
 	init_video_capture(width, height);
 
 	for (;;) {
-		key = video_capture(src_image, width, height);
+		video_capture(src_image, width, height);
 		draw_framebuffer(src_image, width, height);
 	}
 

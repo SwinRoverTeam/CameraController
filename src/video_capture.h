@@ -10,8 +10,14 @@ struct buffer {
 	size_t length;
 };
 
-void init_video_capture(int width, int height);
-char video_capture(unsigned char* dst, int width, int height);
-void free_video_capture();
+typedef struct device_info {
+	int fd;
+	int n_buffers;
+	struct buffer* buffers;
+} device_info_t;
+
+int init_video_capture(device_info_t* dev, char* dev_name, int width, int height);
+char video_capture(device_info_t* dev, unsigned char* dst, int width, int height);
+void free_video_capture(device_info_t* dev);
 
 #endif // VIDEO_CAPTURE_H_

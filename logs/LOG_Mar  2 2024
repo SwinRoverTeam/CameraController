@@ -4,3 +4,31 @@
 <panels.c:panel_debug:8> x:0, y:0, width:1920, height:1080
 <panels.c:panel_debug:8> x:0, y:540, width:1920, height:540
 <panels.c:panel_debug:8> x:0, y:0, width:1920, height:540
+<src/serial_ports.c:open_port:28> Unable to open comport: /dev/ttyACM0
+<src/serial_ports.c:open_port:118> Unable to get settings<src/serial_ports.c:open_port:118> Unable to get settings<src/serial_ports.c:open_port:118> Unable to get settings<src/serial_ports.c:open_port:118> Unable to get settings<src/serial_ports.c:open_port:118> Unable to get settings<src/serial_ports.c:close_port:227> Failed to read port status when closing
+<src/serial_ports.c:close_port:236> Failed to write status back to port when closing
+<src/serial_ports.c:open_port:118> Unable to get settings
+<src/serial_ports.c:close_port:227> Failed to read port status when closing
+<src/serial_ports.c:close_port:236> Failed to write status back to port when closing
+<src/serial_ports.c:open_port:118> Unable to read port settings
+<src/serial_ports.c:close_port:227> Failed to read port status when closing
+<src/serial_ports.c:close_port:236> Failed to write status back to port when closing
+<src/serial_ports.c:open_port:118> Unable to read port settings
+<src/serial_ports.c:close_port:227> Failed to read port status when closing
+<src/serial_ports.c:close_port:236> Failed to write status back to port when closing
+<src/serial_ports.c:open_port:118> Unable to read port settings
+<src/serial_ports.c:close_port:227> Failed to read port status when closing
+<src/serial_ports.c:close_port:236> Failed to write status back to port when closing
+<src/serial_ports.c:open_port:118> Unable to read port settings
+<src/serial_ports.c:close_port:227> Failed to read port status when closing
+<src/serial_ports.c:close_port:236> Failed to write status back to port when closing
+<test/log_test.c:main:9> Oh no something went wrong!!!<test/log_test.c:main:9> Oh no something went wrong!!!
+<test/log_test.c:main:9> Oh no something went wrong!!!
+<test/log_test.c:main:9> Oh no something went wrong!!!
+<test/log_test.c:main:9> Oh no something went wrong!!!
+<test/log_test.c:main:10> This is just a debug message
+<test/log_test.c:main:9> Oh no something went wrong!!!
+<test/log_test.c:main:10> This is just a debug message
+<test/log_test.c:main:11> Port opened!
+<test/log_test.c:main:9> Oh no something went wrong!!!
+<test/log_test.c:main:11> Port opened!

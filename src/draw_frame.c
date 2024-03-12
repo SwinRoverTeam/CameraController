@@ -1,4 +1,5 @@
 #include "draw_frame.h"
+#include "logging.h"
 
 #include <fcntl.h>
 #include <linux/fb.h>
@@ -8,6 +9,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include <SDL2/SDL.h>
+
 // screen settings
 static int fd = -1;
 struct fb_var_screeninfo vinfo;
@@ -15,13 +18,29 @@ struct fb_fix_screeninfo finfo;
 static char* fbp = NULL;
 static unsigned int screensize = 0;
 
-void free_framebuffer(void)
+// SDL2 GPU
+SDL_Window* win;
+SDL_Renderer* rend;
+SDL_Texture* frame_texture;
+
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 480
+
+void free_frame(void)
 {
-	munmap(fbp, screensize);
+	free_frame();
 	close(fd);
+
+	SDL_DestroyRenderer(rend);
+	rend = NULL;
+
+	SDL_DestroyWindow(win);
+	win = NULL;
+
+	SDL_Quit();
 }
 
-void init_framebuffer(void)
+void init_frame(void)
 {
 	// open frame buffer
 	fd = open("/dev/fb0", O_RDWR);
@@ -65,10 +84,41 @@ void init_framebuffer(void)
 		perror("Error mapping framebuffer device to memory");
 		exit(EXIT_FAILURE);
 	}
+
+	// startup SDL
+	if( SDL_Init( SDL_INIT_VIDEO ) < 0 ) {
+        	printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+	}
+
+	// create SDL window
+        win = SDL_CreateWindow("Camera switcher", 
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        SCREEN_WIDTH, SCREEN_HEIGHT,
+        SDL_WINDOW_SHOWN);
+
+        if (win == NULL) {
+                printf("SDL has failed to create a window with error: %s\n", SDL_GetError());
+		return;
+        }
+
+        rend = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
+        if (rend == NULL) {
+                printf("SDL has failed to create a renderer with error: %s\n", SDL_GetError());
+		return;
+        }
+
+	// make the screen black
+	SDL_SetRenderDrawColor(rend, 0xFF, 0xFF, 0xFF, 0xFF);
+
+	frame_texture = SDL_CreateTexture(rend, SDL_PIXELFORMAT_BGR24,
+        SDL_TEXTUREACCESS_STREAMING,
+        SCREEN_WIDTH, SCREEN_HEIGHT);
 }
 
-void draw_framebuffer(unsigned char* src, int width, int height)
+void draw_frame(unsigned char* src, int width, int height)
 {
+	// draw with CPU
+	/*
 	int x, y;
 	unsigned int location = 0;
 	int i = 0;
@@ -81,4 +131,11 @@ void draw_framebuffer(unsigned char* src, int width, int height)
 			i++;
 		}
 	}
+	*/
+
+	SDL_UpdateTexture(frame_texture, NULL, src, width * 3);
+
+	//SDL_RenderClear(rend);
+	SDL_RenderCopy(rend, frame_texture, NULL, NULL );
+	SDL_RenderPresent(rend);
 }

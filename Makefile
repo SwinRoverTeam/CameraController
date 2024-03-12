@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# define toolchain (should be arm compilers or compile on the jetson)
+# define toolchain (should be same on jetson)
 CC := gcc
 LD := gcc
 
@@ -18,7 +18,7 @@ OBJS := $(SRC:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 INC_DIRS := $(shell find $(SRC_DIR) -type d)
 INC_FLAGS := $(addprefix -I, $(INC_DIRS))
 
-LDFLAGS += -lc -lv4l2
+LDFLAGS += -lc -lv4l2 -lSDL2
 CFLAGS += -g $(INC_FLAGS)
 
 # default rule

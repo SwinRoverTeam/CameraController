@@ -24,7 +24,7 @@ int open_port(char* dev_name, int baudrate_flag,
 
 	// open port
 	port = open(dev_name, O_RDWR | O_NOCTTY | O_NDELAY);
-	if (port <= 0) {
+	if (port == -1) {
 	      LOG_ERROR("Unable to open comport: %s\n", dev_name);
 	      return 1;
 	}
@@ -106,16 +106,7 @@ int open_port(char* dev_name, int baudrate_flag,
 	      tcsetattr(port, TCSANOW, &old_port_settings);
 	      close(port);
 	      flock(port, LOCK_UN);
-	      LOG_ERROR("Unable to adjust settings");
-	      return 1;
-	}
-
-	// write control settings
-	if (tcsetattr(port, TIOCMSET, &port_settings) == -1) {
-	      tcsetattr(port, TCSANOW, &old_port_settings);
-	      close(port);
-	      flock(port, LOCK_UN);
-	      LOG_ERROR("Unable to get settings");
+	      LOG_ERROR("Unable to adjust settings\n");
 	      return 1;
 	}
 
@@ -125,7 +116,7 @@ int open_port(char* dev_name, int baudrate_flag,
 	      tcsetattr(port, TCSANOW, &old_port_settings);
 	      close(port);
 	      flock(port, LOCK_UN);
-	      LOG_ERROR("Unable to get status");
+	      LOG_ERROR("Unable to get status\n");
 	      return 1;
 	}
 
@@ -136,7 +127,7 @@ int open_port(char* dev_name, int baudrate_flag,
 	      tcsetattr(port, TCSANOW, &old_port_settings);
 	      close(port);
 	      flock(port, LOCK_UN);
-	      LOG_ERROR("Unable to set status");
+	      LOG_ERROR("Unable to set status\n");
 	      return 1;
 	}
 
@@ -160,7 +151,7 @@ int read_port(int port, unsigned char* buffer, int size)
 }
 
 // block until size bytes are read or max retries reached
-#define MAX_RETRIES 1000
+#define MAX_RETRIES 3000
 int read_port_blocking(int port, unsigned char* buffer, int size)
 {
 	int n, total = 0, tries = 0;
@@ -171,11 +162,13 @@ int read_port_blocking(int port, unsigned char* buffer, int size)
 
 		total += n;
 
-		if (n < 1) tries++;
+		if (n == 0) tries++;
 
 		// check still reading
 		if (total >= size) break;
 		if (tries >= MAX_RETRIES) break;
+
+		printf("retries used: %i\n", tries);
 	}
 
 	// failure - return bytes read

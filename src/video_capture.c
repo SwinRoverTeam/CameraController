@@ -17,16 +17,6 @@
 #include <string.h>				/* string compare */
 
 
-static char* dev_name = "/dev/video2";
-static int fd = -1; /* vidoe0 file descriptor*/
-
-/* Queried image buffers! */
-struct buffer* buffers = NULL;
-static unsigned int n_buffers = 0;
-struct v4l2_buffer buf_in_while_loop;
-static fd_set fds;
-struct timeval tv;
-
 /* wrapped errno display function by v4l2 API */
 static void errno_exit(const char * s)
 {
@@ -35,18 +25,20 @@ static void errno_exit(const char * s)
 }
 
 /* wrapped ioctrl function by v4l2 API */
-static int xioctl(int fd, int request, void * arg)
+static int xioctl(device_info_t* dev, int request, void * arg)
 {
 	int r;
 	do{
-		r = ioctl(fd, request, arg);
+		r = ioctl(dev->fd, request, arg);
 	}
 	while(-1 == r && EINTR == errno);
 	return r;
 }
 
-static void open_device()
+static void open_device(device_info_t* dev, char* dev_name)
 {
+	dev->fd = -1; // camera file descriptor
+
 	struct stat st;
 	if (-1 == stat(dev_name, &st)) {
 		fprintf(stderr, "Cannot identify '%s': %d, %s\n", dev_name, errno, strerror(errno));
@@ -56,8 +48,8 @@ static void open_device()
 		fprintf(stderr, "%s is no device\n", dev_name);
 		exit(EXIT_FAILURE);
 	}
-	fd = open(dev_name, O_RDWR | O_NONBLOCK, 0);
-	if (-1 == fd) {
+	dev->fd = open(dev_name, O_RDWR | O_NONBLOCK, 0);
+	if (-1 == dev->fd) {
 		fprintf(stderr, "Cannot open '%s': %d, %s\n", dev_name, errno, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
@@ -68,7 +60,7 @@ static void open_device()
  * 	  before they can be mapped into the application's address space
  * 2. set four images in buffer
  */
-static void init_mmap()
+static void init_mmap(device_info_t* dev)
 {
 	struct v4l2_requestbuffers req;
 	CLEAR(req);
@@ -76,9 +68,9 @@ static void init_mmap()
 	req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	req.memory = V4L2_MEMORY_MMAP;
 	/* Initiate Memory Mapping */
-	if (-1 == xioctl(fd, VIDIOC_REQBUFS, &req)) {
+	if (-1 == xioctl(dev->fd, VIDIOC_REQBUFS, &req)) {
 		if (EINVAL == errno) {
-			fprintf(stderr, "%s does not support memory mapping\n", dev_name);
+			fprintf(stderr, "does not support memory mapping\n");
 			exit(EXIT_FAILURE);
 		} else {
 			errno_exit("VIDIOC_REQBUFS");
@@ -87,49 +79,49 @@ static void init_mmap()
 
 	/* video output requires at least two buffers, one displayed and one filled by the application */
 	if (req.count < 2) {
-		fprintf(stderr, "Insufficient buffer memory on %s\n", dev_name);
+		fprintf(stderr, "Insufficient buffer memory\n");
 		exit(EXIT_FAILURE);
 	}
-	buffers = calloc(req.count, sizeof(*buffers));
+	dev->buffers = calloc(req.count, sizeof(struct buffer*)));
 
-	if (!buffers) {
+	if (!dev->buffers) {
 		fprintf(stderr, "Out of memory\n");
 		exit(EXIT_FAILURE);
 	}
 
-	for (n_buffers = 0; n_buffers < req.count; ++n_buffers) {
+	for (dev->n_buffers = 0; dev->n_buffers < req.count; ++dev->n_buffers) {
 		struct v4l2_buffer buf;
 		CLEAR(buf);
 		buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		buf.memory = V4L2_MEMORY_MMAP;
-		buf.index = n_buffers;
+		buf.index = dev->n_buffers;
 
 		/* Query the status of a buffer */
-		if (-1 == xioctl(fd, VIDIOC_QUERYBUF, &buf)){
+		if (-1 == xioctl(dev, VIDIOC_QUERYBUF, &buf)){
 			errno_exit("VIDIOC_QUERYBUF");
 		}
 
-		buffers[n_buffers].length = buf.length; //640 * 480 * 2 = 614400
-		buffers[n_buffers].start = mmap(NULL /* start anywhere */, buf.length,
+		dev->buffers[dev->n_buffers].length = buf.length; //640 * 480 * 2 = 614400
+		dev->buffers[dev->n_buffers].start = mmap(NULL /* start anywhere */, buf.length,
 		PROT_READ | PROT_WRITE /* required */,
-		MAP_SHARED /* recommended */, fd, buf.m.offset);
+		MAP_SHARED /* recommended */, dev->fd, buf.m.offset);
 
-		if (MAP_FAILED == buffers[n_buffers].start){
+		if (MAP_FAILED == dev->buffers[dev->n_buffers].start){
 			errno_exit("mmap");
 		}
 	}
 }
 
 /* set video streaming format here(width, height, pixel format, cropping, scaling) */
-static void init_device(int width, int height)
+void init_device(device_info_t* dev, int width, int height)
 {
 	struct v4l2_capability cap;
 	struct v4l2_format fmt;
 	unsigned int min;
 
-	if (-1 == xioctl(fd, VIDIOC_QUERYCAP, &cap)) {
+	if (-1 == xioctl(dev->fd, VIDIOC_QUERYCAP, &cap)) {
 		if (EINVAL == errno) {
-			fprintf(stderr, "%s is no V4L2 device\n", dev_name);
+			fprintf(stderr, "no V4L2 device\n");
 			exit(EXIT_FAILURE);
 		} else {
 			errno_exit("VIDIOC_QUERYCAP");
@@ -137,12 +129,12 @@ static void init_device(int width, int height)
 	}
 
 	if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
-		fprintf(stderr, "%s is no video capture device\n", dev_name);
+		fprintf(stderr, "no video capture device\n");
 		exit(EXIT_FAILURE);
 	}
 
 	if (!(cap.capabilities & V4L2_CAP_STREAMING)) {
-		fprintf(stderr, "%s does not support streaming i/o\n", dev_name);
+		fprintf(stderr, "does not support streaming i/o\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -153,7 +145,7 @@ static void init_device(int width, int height)
 	fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
 	fmt.fmt.pix.field = V4L2_FIELD_INTERLACED;
 
-	if (-1 == xioctl(fd, VIDIOC_S_FMT, &fmt)) {
+	if (-1 == xioctl(dev->fd, VIDIOC_S_FMT, &fmt)) {
 		errno_exit("VIDIOC_S_FMT");
 	}
 
@@ -168,15 +160,15 @@ static void init_device(int width, int height)
 		fmt.fmt.pix.sizeimage = min;
 	}
 
-	init_mmap();
+	init_mmap(dev->fd);
 }
 
-static void start_capturing()
+static void start_capturing(device_info_t* dev)
 {
 	unsigned int i;
 	enum v4l2_buf_type type;
 	
-	for (i = 0; i < n_buffers; ++i) {
+	for (i = 0; i < dev->n_buffers; ++i) {
 		struct v4l2_buffer buf;
 		CLEAR(buf);
 		buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -184,26 +176,26 @@ static void start_capturing()
 		buf.index = i;
 
 		/* enqueue an empty (capturing) or filled (output) buffer in the driver's incoming queue */
-		if (-1 == xioctl(fd, VIDIOC_QBUF, &buf)) {
+		if (-1 == xioctl(dev->fd, VIDIOC_QBUF, &buf)) {
 			errno_exit("VIDIOC_QBUF");
 		}
 	}
 
 	type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	/* Start streaming I/O */
-	if (-1 == xioctl(fd, VIDIOC_STREAMON, &type)){
+	if (-1 == xioctl(dev->fd, VIDIOC_STREAMON, &type)){
 		errno_exit("VIDIOC_STREAMON");
 	}
 }
 
-static void close_device()
+static void close_device(device_info_t* dev)
 {
-	if (-1 == close(fd))
+	if (-1 == close(dev->fd))
 		errno_exit("close");
-	fd = -1;
+	dev->fd = -1;
 }
 
-static void stop_capturing()
+static void stop_capturing(device_info_t* dev)
 {
 	enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	if (-1 == xioctl(fd, VIDIOC_STREAMOFF, &type)){
@@ -211,34 +203,42 @@ static void stop_capturing()
 	}
 }
 
-static void uninit_device()
+static void uninit_device(device_info_t* dev)
 {
 	unsigned int i;
-	for (i = 0; i < n_buffers; ++i){
-		if (-1 == munmap(buffers[i].start, buffers[i].length)){
+	for (i = 0; i < dev->n_buffers; ++i){
+		if (-1 == munmap(dev->buffers[i].start, dev->buffers[i].length)){
 			errno_exit("munmap");
 		}
 	}
-	free(buffers);
+	free(dev->buffers);
 }
 
+// convert a YUY2 format into BGR24
 static void parse_im(const unsigned char *im_yuv, unsigned char *dst, int width, int height)
 {
     const int IM_SIZE = width * height;
+
     unsigned char Y = 0;
     unsigned char U = 0;
     unsigned char V = 0;
+
     int B = 0;
     int G = 0;
     int R = 0;
 
     int i;
     for(i = 0; i < IM_SIZE; ++i) {
+
+	// pixel:  0   1   2   3  ,  4   5   6   7
+	//	  [Y0][U0][Y1][V0], [Y2][U1][Y3][V1]
+
         if(!(i & 1)) {
             U = im_yuv[2 * i + 1];
             V = im_yuv[2 * i + 3];
         }
         Y = im_yuv[2 * i];
+
         B = Y + 1.773 * (U - 128);
         G = Y - 0.344 * (U - 128) - (0.714 * (V - 128));
         R = Y + 1.403 * (V - 128);
@@ -259,31 +259,36 @@ static void parse_im(const unsigned char *im_yuv, unsigned char *dst, int width,
     }
 }
 
-void init_video_capture(int width, int height)
+int init_video_capture(device_info_t* dev, char* dev_name, int width, int height)
 {
-	open_device();
-	init_device(width, height);
-	start_capturing();
+	open_device(dev, dev_name);
+	init_device(dev, width, height);
+	start_capturing(dev);
 }
 
-char video_capture(unsigned char* dst, int width, int height)
+char video_capture(device_info_t* dev, unsigned char* dst, int width, int height)
 {
+	struct v4l2_buffer buf_in_while_loop;
+	struct timeval tv;
+	static fd_set fds;
+
+
 	FD_ZERO(&fds);
-	FD_SET(fd, &fds);
+	FD_SET(dev->fd, &fds);
 	FD_SET(fileno(stdin), &fds);
 
 	/* Timeout. */
 	tv.tv_sec = 2;
 	tv.tv_usec = 0;
-	select(fd + 1, &fds, NULL, NULL, &tv);
+	select(dev->fd + 1, &fds, NULL, NULL, &tv);
 
-	if(FD_ISSET(fd, &fds)) {
+	if(FD_ISSET(dev->fd, &fds)) {
 		CLEAR(buf_in_while_loop);
 		buf_in_while_loop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		buf_in_while_loop.memory = V4L2_MEMORY_MMAP;
 
 		/* dequeue from buffer */
-		if(-1 == xioctl(fd, VIDIOC_DQBUF, &buf_in_while_loop)) {
+		if(-1 == xioctl(dev->fd, VIDIOC_DQBUF, &buf_in_while_loop)) {
 			switch(errno) {
 			case EAGAIN:
 				return 0;
@@ -291,12 +296,16 @@ char video_capture(unsigned char* dst, int width, int height)
 				errno_exit("VIDIOC_DQBUF");
 			}
 		}
-
-		unsigned char* im_from_cam = (unsigned char*)buffers[buf_in_while_loop.index].start;
-        parse_im(im_from_cam, dst, width, height);
+        	
+		// convert to BGR24 format
+		unsigned char* im_from_cam = (unsigned char*)dev->buffers[buf_in_while_loop.index].start;
+		parse_im(im_from_cam, dst, width, height);
+		
+		// copy without convert (faster but doesn't work with sdl2???)
+		// dst = (unsigned char*)buffers[buf_in_while_loop.index].start;
 
 		/* queue-in buffer */
-		if(-1 == xioctl(fd, VIDIOC_QBUF, &buf_in_while_loop)) {
+		if(-1 == xioctl(dev->fd, VIDIOC_QBUF, &buf_in_while_loop)) {
 			errno_exit("VIDIOC_QBUF");
 		}
 	}
@@ -304,9 +313,33 @@ char video_capture(unsigned char* dst, int width, int height)
 	return 0;
 }
 
-void free_video_capture()
+void free_video_capture(device_info_t* dev)
 {
-	stop_capturing();
-	uninit_device();
-	close_device();
+	stop_capturing(dev);
+	uninit_device(dev);
+	close_device(dev);
+}
+
+#define DEVICE_DIR "/dev"
+#define DEIVCE_PREFIX "video"
+
+int video_capability(struct v4l2_capability* cap, char* file_path)
+{
+	FILE* f = open(file_path, O_RDWR);
+
+	// no such file
+	if (!f) {
+		return 0;
+	}
+
+	if (ioctl(f, VIDIOC_QUERYCAP, &cap) < 0) {
+		close(f);
+		return 0;
+	}
+
+	// print names
+	printf("device info: %s\n", cap->driver);
+
+	close(f);
+	return 1;
 }
