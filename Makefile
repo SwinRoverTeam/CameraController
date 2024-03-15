@@ -32,6 +32,20 @@ $(TARGET): $(OBJS)
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+.PHONY: clean tests
+
 clean:
 	rm -r $(BUILD_DIR)
 	rm $(TARGET)
+
+tests:
+	#gcc -g test/device_test.c src/video_capture.c -lc -o test/dev
+	gcc -g test/log_test.c -DDEBUG -lc -o test/log
+	gcc -g test/panel_test.c src/panels.c -lc -o test/panel
+	gcc -g test/serial_test.c src/serial_ports.c -lc -o test/serial
+	gcc -g test/stream_test.c src/video_capture.c src/draw_frame.c -lSDL2 -o test/stream
+
+clean_test:
+	rm test/stream
+	rm test/log
+	rm test/serial
