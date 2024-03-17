@@ -2,16 +2,16 @@
 #include "logging.h"
 
 #include <stdio.h>
-
 #include <SDL2/SDL.h>
+
+// HARDCODED FRAME SIZE
+#define FRAME_WIDTH 1280
+#define FRAME_HEIGHT 720
 
 // SDL2 GPU
 SDL_Window* win;
 SDL_Renderer* rend;
 SDL_Texture* frame_texture;
-
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 480
 
 void free_draw(void)
 {
@@ -21,10 +21,10 @@ void free_draw(void)
 	SDL_DestroyWindow(win);
 	win = NULL;
 
-	SDL_Quit();
+	//SDL_Quit();
 }
 
-void init_draw(void)
+void init_draw(int width, int height)
 {
 	// startup SDL
 	if( SDL_Init(SDL_INIT_VIDEO) < 0 ) {
@@ -34,7 +34,7 @@ void init_draw(void)
 	// create SDL window
         win = SDL_CreateWindow("Camera switcher", 
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        SCREEN_WIDTH, SCREEN_HEIGHT,
+        width, height,
         SDL_WINDOW_SHOWN);
 
         if (win == NULL) {
@@ -55,16 +55,31 @@ void init_draw(void)
 	// make the screen black
 	SDL_SetRenderDrawColor(rend, 0xFF, 0xFF, 0xFF, 0xFF);
 
-	frame_texture = SDL_CreateTexture(rend, SDL_PIXELFORMAT_BGR24,
+	frame_texture = SDL_CreateTexture(rend, SDL_PIXELFORMAT_YUY2,
         SDL_TEXTUREACCESS_STREAMING,
-        SCREEN_WIDTH, SCREEN_HEIGHT);
+        FRAME_WIDTH, FRAME_HEIGHT);
 }
 
-void draw_frame(unsigned char* src, int width, int height)
+int draw_frame(unsigned char* src, int width, int height)
 {
-	SDL_UpdateTexture(frame_texture, NULL, src, width * 3);
+	SDL_Event* e;
 
-	//SDL_RenderClear(rend);
-	SDL_RenderCopy(rend, frame_texture, NULL, NULL );
+	SDL_PollEvent(e);
+	if (e->type == SDL_QUIT) {
+		return 1;
+	}
+
+	SDL_UpdateTexture(frame_texture, NULL, src, FRAME_WIDTH * 2);
+
+	// create smaller rect for grabbing a frame
+	SDL_Rect src_rect;
+	src_rect.x = 0;
+	src_rect.y = 0;
+	src_rect.w = width;
+	src_rect.h = height;
+
+	SDL_RenderCopy(rend, frame_texture, NULL, &src_rect);
 	SDL_RenderPresent(rend);
+
+	return 0;
 }

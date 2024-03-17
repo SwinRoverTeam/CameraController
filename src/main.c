@@ -1,96 +1,122 @@
 #include "logging.h"
-#include "draw_frame.h"
-#include "video_capture.h"
 #include "serial_ports.h"
-#include "panels.h"
+#include "video_capture.h"
+#include "draw_frame.h"
 
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
-// file descriptor for serial port
+#define SCREEN_WIDTH 1920
+#define SCREEN_HEIGHT 1080
+
+#define FRAME_WIDTH 1280
+#define FRAME_HEIGHT 720
+
 int fd;
 
-void initialise_serial()
+void quit()
 {
-	// open a new serial port to cube
-	fd = open_port("/dev/ttyTHS1", 115200, "8N1", 0);
-
-	if (fd == 1) {
-		LOG_ERROR("Failed to open serial port\n");
-	}
-}
-
-void list_cameras(void)
-{
-	// list video devices in dev
-	device_info_t* video_devices;
-	list_video_devices(&video_devices);
-}
-
-void change_camera(char* device)
-{
-}
-
-void start_stream(void)
-{
-}
-
-void end_stream(void)
-{
-}
-
-void reset_application(void)
-{
-}
-
-void stack_stream(char* stack_direction, char* device)
-{
-	
-}
-
-void shutdown(void)
-{
-	LOG_INFO("Application shutdown by user\n");
-
 	free_video_capture();
-	free_framebuffer();
+	free_draw();
+	exit(1);
 }
 
 void signal_handler(int signum)
 {
 	if (signum == SIGKILL | signum == SIGTERM) {
-		shutdown();
-		exit(0);
+		quit();
+	}
+}
+
+int check_video_device(char* msg)
+{
+	char* compare_string = "/dev/video";
+
+	if (strncmp(compare_string, msg, strlen(compare_string)) == 0)
+	{
+		return 1;
+	}
+
+	return 0;
+}
+
+char* current_cam = NULL;
+void change_cam(char* new_cam)
+{
+	if (current_cam != NULL)
+	{
+		free_video_capture();
+	}
+	
+	current_cam = new_cam;
+	init_video_capture(current_cam);
+
+	unsigned char* str = "ok";
+	send_buffer_port(fd, str, 3);
+}
+
+#define BUFFER_SIZE 12
+unsigned char buffer[BUFFER_SIZE];
+static int msg_len = 0;
+
+void process_cmd(char* cmd)
+{
+	if (check_video_device(cmd) == 1) {
+		change_cam(cmd);
 	}
 }
 
 int main(int argc, char** argv)
 {
-	// create signal handler
+        // create signal handler
 	if (signal(SIGINT, signal_handler) == SIG_ERR) {
-		LOG_ERROR("Failed to create signal handler\n");
+		puts("Failed to create signal handler");
 		return 1;
 	}
 
-	// set video framebuffer size
-	int width = 640;
-	int height = 480;
+	char* device_paths[] = {"/dev/video0", "/dev/video2", "/dev/video4"};
 
-	printf("Using size: %dx%d.\n", width, height);
-	usleep(1 * 1000000); // sleep one second
+	//init_video_capture(device_paths[0], SCREEN_WIDTH, SCREEN_HEIGHT);
+	change_cam(device_paths[0]); // /dev/video0 is default cam
+        init_draw(SCREEN_WIDTH, SCREEN_HEIGHT);
 
-	unsigned char src_image[width * height * 3];
+	// open serial port
+	fd = open_port("/dev/ttyACM0", 115200, "8N1", 0);
 
-	init_framebuffer();
-	init_video_capture(width, height);
-
-	for (;;) {
-		video_capture(src_image, width, height);
-		draw_framebuffer(src_image, width, height);
+	if (fd == 1) {
+		LOG_ERROR("failed to read from port :(\n");
+		close_port(fd);
+		//return 0;
 	}
 
-	return EXIT_SUCCESS;
+	for (;;) {
+                unsigned char src_raw_image[(FRAME_WIDTH * 2) * FRAME_HEIGHT];
+                video_capture(src_raw_image);
+
+		if (draw_frame(src_raw_image, SCREEN_WIDTH, SCREEN_HEIGHT) > 0) {
+			quit();
+		}
+
+		if (fd != 1)
+		{
+
+			int err = read_port(fd, buffer, BUFFER_SIZE);
+
+			if (err == -1) {
+				LOG_ERROR("failed to read from port :(\n");
+				close_port(fd);
+				return 0;
+			} else if (err > 0) {
+				msg_len += err;
+				// add null terminator inplace of newline
+				buffer[err - 1] = 0;
+				LOG_INFO("serial read: %s\n", buffer);
+				process_cmd(buffer);
+			}
+		}
+	}
+
+        quit();
 }
