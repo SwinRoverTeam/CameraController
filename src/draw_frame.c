@@ -2,84 +2,141 @@
 #include "logging.h"
 
 #include <stdio.h>
-#include <SDL2/SDL.h>
+#include <limits.h>
 
-// HARDCODED FRAME SIZE
-#define FRAME_WIDTH 1280
-#define FRAME_HEIGHT 720
+// GPU stuff
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <GL/glx.h>
+#include <X11/Xlib.h>
 
-// SDL2 GPU
-SDL_Window* win;
-SDL_Renderer* rend;
-SDL_Texture* frame_texture;
+Display *display;
+Window window;
+XVisualInfo *visualInfo;
+Colormap colormap;
+GLXContext glxContext;
 
 void free_draw(void)
 {
-	SDL_DestroyRenderer(rend);
-	rend = NULL;
+	if (glxContext){
+		glXDestroyContext(display, glxContext);
+	}
 
-	SDL_DestroyWindow(win);
-	win = NULL;
+	if (window){
+		XDestroyWindow(display, window);
+	}
 
-	//SDL_Quit();
+	if (colormap){
+		XFreeColormap(display, colormap);
+	}
+
+	if (visualInfo){
+		XFree(visualInfo);
+	}
+
+	if (display){
+		XCloseDisplay(display);
+	}
 }
 
 void init_draw(int width, int height)
 {
-	// startup SDL
-	if( SDL_Init(SDL_INIT_VIDEO) < 0 ) {
-        	printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+	display = XOpenDisplay(NULL);
+	if (!display)
+	{
+		LOG_ERROR("Failed to open X display\n");
+		return;
 	}
 
-	// create SDL window
-        win = SDL_CreateWindow("Camera switcher", 
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        width, height,
-        SDL_WINDOW_SHOWN);
+	int screen = DefaultScreen(display);
 
-        if (win == NULL) {
-                printf("SDL has failed to create a window with error: %s\n", SDL_GetError());
+	static int visualAttribs[] = {
+	    GLX_RGBA,
+	    GLX_DEPTH_SIZE, 24,
+	    GLX_DOUBLEBUFFER,
+	    None};
+
+	visualInfo = glXChooseVisual(display, screen, visualAttribs);
+	if (!visualInfo)
+	{
+		LOG_ERROR("Failed to find suitable visual\n");
 		return;
-        }
-
-        rend = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
-        if (rend == NULL) {
-                printf("SDL has failed to create a renderer with error: %s\n", SDL_GetError());
-		return;
-        }
-
-	if (frame_texture == NULL) {
-		printf("the camera has failed to initialise");
 	}
 
-	// make the screen black
-	SDL_SetRenderDrawColor(rend, 0xFF, 0xFF, 0xFF, 0xFF);
+	colormap = XCreateColormap(display, RootWindow(display, visualInfo->screen), visualInfo->visual, AllocNone);
 
-	frame_texture = SDL_CreateTexture(rend, SDL_PIXELFORMAT_YUY2,
-        SDL_TEXTUREACCESS_STREAMING,
-        FRAME_WIDTH, FRAME_HEIGHT);
+	XSetWindowAttributes windowAttribs;
+	windowAttribs.colormap = colormap;
+	windowAttribs.event_mask = ExposureMask | KeyPressMask;
+
+	window = XCreateWindow(display, RootWindow(display, visualInfo->screen), 0, 0, width, height, 0,
+			       visualInfo->depth, InputOutput, visualInfo->visual, CWColormap | CWEventMask, &windowAttribs);
+
+	XMapWindow(display, window);
+
+	const char *glxExtensions = glXQueryExtensionsString(display, screen);
+	if (!glXQueryExtension(display, NULL, NULL) || !glXQueryVersion(display, NULL, NULL))
+	{
+		LOG_ERROR("GLX extension not available\n");
+		return;
+	}
+
+	glxContext = glXCreateContext(display, visualInfo, NULL, GL_TRUE);
+	if (!glxContext)
+	{
+		LOG_ERROR("Failed to create GLX context\n");
+		return;
+	}
+
+	// select buffers
+	glXMakeCurrent(display, window, glxContext);
 }
 
-int draw_frame(unsigned char* src, int width, int height)
+void reshape(int w, int h)
 {
-	SDL_Event* e;
+	glViewport(0, 0, (GLsizei)w, (GLsizei)h);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluOrtho2D(-1, 1, -1, 1);
+	glMatrixMode(GL_MODELVIEW);
+}
 
-	SDL_PollEvent(e);
-	if (e->type == SDL_QUIT) {
-		return 1;
+void draw(unsigned char *data, int w, int h)
+{
+	// Clear the color buffer
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	// Set up 2D projection
+	glViewport(0, 0, w, h);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluOrtho2D(0, w, 0, h);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	// Render the provided pixel data
+	glRasterPos2i(0, h);
+	glPixelZoom(1, -1);
+	glDrawPixels(w, h, GL_BGR, GL_UNSIGNED_BYTE, data);
+
+	// Swap buffers
+	glXSwapBuffers(display, window);
+}
+
+int draw_frame(unsigned char *src, int w, int h)
+{
+	XEvent event;
+
+	draw(src, w, h);	
+	
+	// check event if available
+	if (XPending(display)) {
+		XNextEvent(display, &event);
+		if (event.type == KeyPress)
+		{
+			return 1;
+		}
 	}
-
-	SDL_UpdateTexture(frame_texture, NULL, src, FRAME_WIDTH * 2);
-
-	// create smaller rect for grabbing a frame
-	SDL_Rect src_rect;
-	src_rect.x = 0;
-	src_rect.y = 0;
-	src_rect.w = width;
-	src_rect.h = height;
-
-	SDL_RenderCopy(rend, frame_texture, NULL, &src_rect);
-	SDL_RenderPresent(rend);
 
 	return 0;
 }

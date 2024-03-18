@@ -13,10 +13,6 @@
 #include <sys/time.h>           /* for select time */
 #include <limits.h>             /* for UCHAR_MAX */
 
-// HARDCODED FRAME SIZE
-#define FRAME_WIDTH 1280
-#define FRAME_HEIGHT 720
-
 static char* dev_name;
 static int fd = -1; /* vidoe0 file descriptor*/
 
@@ -208,8 +204,6 @@ static void parse_im(const unsigned char *im_yuv, unsigned char *dst, int width,
     int R = 0;
     int i;
 
-
-
     for(i = 0; i < IM_SIZE; ++i){
         if(!(i & 1)){
             U = im_yuv[2 * i + 1];
@@ -234,20 +228,14 @@ static void parse_im(const unsigned char *im_yuv, unsigned char *dst, int width,
     }
 }
 
-void init_video_capture(char* name) {
-
-	int width = FRAME_WIDTH, height = FRAME_HEIGHT;
-
+void init_video_capture(char* name, int width, int height) {
 	dev_name = name;
 	open_device();
 	init_device(width, height);
 	start_capturing();
 }
 
-char video_capture(unsigned char* dst) {
-
-	int width = FRAME_WIDTH, height = FRAME_HEIGHT;
-
+char video_capture(unsigned char* dst, int width, int height) {
 	char key = 0;
 	FD_ZERO(&fds);
 	FD_SET(fd, &fds);
@@ -278,8 +266,12 @@ char video_capture(unsigned char* dst) {
 		}
 
 		unsigned char* im_from_cam = (unsigned char*)buffers[buf_in_while_loop.index].start;
-		//parse_im(im_from_cam, dst, width, height);
-		memcpy(dst, im_from_cam, width * height * 2);
+		
+		// convert buffer to BGR format
+		parse_im(im_from_cam, dst, width, height);
+
+		//copy buffer as YUY2
+		//memcpy(dst, im_from_cam, width * height * 2);
 
 		/* queue-in buffer */
 		if(-1 == xioctl(fd, VIDIOC_QBUF, &buf_in_while_loop)){
