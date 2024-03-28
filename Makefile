@@ -18,7 +18,7 @@ OBJS := $(SRC:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 INC_DIRS := $(shell find $(SRC_DIR) -type d)
 INC_FLAGS := $(addprefix -I, $(INC_DIRS))
 
-LDFLAGS += -lc -lv4l2 -lSDL2
+LDFLAGS += -lc -lGL -lGLU -lX11
 CFLAGS += -g $(INC_FLAGS)
 
 # default rule
